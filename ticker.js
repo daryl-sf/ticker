@@ -48,40 +48,46 @@ const colorize = (value, formatted) => {
 const sparkline = (data) => {
   if (data.length < 2) return "";
 
-  const MAX_SPARKLINE_LENGTH = 23
-  const blocks = "▁▂▃▄▅▆▇█"
+  const MAX_LEN = 25;
+  const points = data.slice(-MAX_LEN);
 
-  // Take only the most recent points if data exceeds max length
-  const displayData = data.length > MAX_SPARKLINE_LENGTH
-    ? data.slice(-MAX_SPARKLINE_LENGTH)
-    : data;
-
-  const min = Math.min(...displayData);
-  const max = Math.max(...displayData);
+  const blocks = "▁▂▃▄▅▆▇█";
+  const min = Math.min(...points);
+  const max = Math.max(...points);
   const range = max - min || 1;
 
-  const minIndex = displayData.indexOf(min);
-  const maxIndex = displayData.indexOf(max);
+  let line = "";
 
-  const line = displayData
-    .map((n, i) => {
-      if (i === minIndex) return "L";
-      if (i === maxIndex) return "H";
+  for (let i = 0; i < points.length; i++) {
+    const n = points[i];
+    const idx = Math.floor(((n - min) / range) * (blocks.length - 1));
+    const char = blocks[idx];
 
-      const idx = Math.floor(((n - min) / range) * (blocks.length - 1));
-      return blocks[idx];
-    })
-    .join("");
+    if (i === 0) {
+      line += char;
+      continue;
+    }
 
-  const last = displayData[displayData.length - 1];
-  const prev = displayData[displayData.length - 2];
+    const delta = n - points[i - 1];
+
+    if (delta > 0) {
+      line += `\x1b[32m${char}\x1b[0m`;
+    } else if (delta < 0) {
+      line += `\x1b[31m${char}\x1b[0m`;
+    } else {
+      line += char;
+    }
+  }
+
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
 
   if (last > prev) {
-    return `\x1b[32m${line} ▲\x1b[0m`;
+    return `${line} \x1b[32m▲\x1b[0m`;
   }
 
   if (last < prev) {
-    return `\x1b[31m${line} ▼\x1b[0m`;
+    return `${line} \x1b[31m▼\x1b[0m`;
   }
 
   return `${line} ▶`;
