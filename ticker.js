@@ -1,4 +1,4 @@
-import fs from "fs";
+const fs = require("fs");
 
 const stockSymbol = (process.argv[2] || "EQPT").toUpperCase();
 const shares = Number(process.argv[3]);
