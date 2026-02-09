@@ -48,20 +48,25 @@ const colorize = (value, formatted) => {
 const sparkline = (data) => {
   if (data.length < 2) return "";
 
-  const MAX_LEN = 25;
+  const MAX_LEN = 20;
   const points = data.slice(-MAX_LEN);
 
-  const blocks = "▁▂▃▄▅▆▇█";
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
+
+  // Horizontal scan line characters (bottom to top)
+  const lines = ["⎽", "⎼", "─", "⎻", "⎺"];
 
   let line = "";
 
   for (let i = 0; i < points.length; i++) {
     const n = points[i];
-    const idx = Math.floor(((n - min) / range) * (blocks.length - 1));
-    const char = blocks[idx];
+    const idx = Math.min(
+      lines.length - 1,
+      Math.floor(((n - min) / range) * lines.length)
+    );
+    const char = lines[idx];
 
     if (i === 0) {
       line += char;
