@@ -1,6 +1,6 @@
 # ticker
 
-A lightweight terminal stock ticker that shows real-time price data, position performance, and a sparkline chart directly in your shell.
+A lightweight terminal stock ticker that shows real-time price data, position performance, and a sparkline chart directly in your shell. Optionally estimates UK PAYE tax and NI on exercise gains.
 
 `ticker` is designed to be fast, dependency-free, and pleasant to leave running all day.
 
@@ -20,8 +20,12 @@ A lightweight terminal stock ticker that shows real-time price data, position pe
 * Position tracking
 
   * Position value
-  * Unrealized P/L (dollars and percent)
+  * Gross P/L (dollars and percent)
   * Today’s dollar change
+* **Optional UK tax estimation** (when `config.json` is set):
+
+  * Estimated Income Tax (PAYE) and Employee NI on exercise gain
+  * Net after tax and effective tax rate
 * Green / red coloring for gains and losses
 
 ---
@@ -37,21 +41,48 @@ No external npm dependencies are required.
 
 ## Installation
 
-Clone or copy the script locally:
+Clone or copy the project (you need `ticker.js`, `utils.js`, and `tax.js` in the same directory):
 
 ```bash
 git clone <repo>
 cd ticker
 ```
 
-Or just drop `ticker.js` anywhere and run it with Node.
+**Optional: UK tax estimates**
+
+To see estimated UK PAYE tax and NI on your option exercise gain:
+
+1. Copy the example config and add your salary:
+
+   ```bash
+   cp config.json.example config.json
+   ```
+
+2. Edit `config.json` and set **salary in GBP** and **USD→GBP rate**:
+
+   ```json
+   {
+     "ukTax": {
+       "taxCode": "1257L",
+       "annualSalary": 45000,
+       "usdToGbp": 0.79
+     }
+   }
+   ```
+
+   * **`annualSalary`** — your gross UK salary in **GBP** (used with UK tax bands).
+   * **`usdToGbp`** — exchange rate: 1 USD = this many GBP (e.g. `0.79`). Your position and gain are in USD; this converts the gain to GBP for the tax calculation. Tax/NI are then converted back to USD for display.
+
+   If you omit `config.json`, or leave `annualSalary` at `0`, or omit/invalid `usdToGbp`, the dashboard shows only gross P/L (no tax section).
+
+`config.json` is gitignored so your salary is never committed.
 
 ---
 
 ## Usage
 
 ```bash
-node ticker [symbol] <shares> <strikePrice> [refreshMs]
+node ticker.js [symbol] <shares> <strikePrice> [refreshMs]
 ```
 
 ### Arguments
@@ -59,16 +90,18 @@ node ticker [symbol] <shares> <strikePrice> [refreshMs]
 | Argument      | Description                      | Required | Default |
 | ------------- | -------------------------------- | -------- | ------- |
 | `symbol`      | Stock ticker symbol              | No       | `EQPT`  |
-| `shares`      | Number of shares you own         | Yes      | —       |
-| `strikePrice` | Your cost basis per share        | Yes      | —       |
+| `shares`      | Number of shares (or options)     | Yes      | —       |
+| `strikePrice` | Your cost basis per share ($)    | Yes      | —       |
 | `refreshMs`   | Refresh interval in milliseconds | No       | `5000`  |
+
+All of `ticker.js`, `utils.js`, and `tax.js` must be in the same directory when you run `node ticker.js`.
 
 ### Examples
 
 ```bash
-node ticker EQPT 100 12.50
-node ticker AAPL 50 175 2000
-node ticker TSLA 10 220
+node ticker.js EQPT 100 12.50
+node ticker.js AAPL 50 175 2000
+node ticker.js TSLA 10 220
 ```
 
 ---
@@ -99,18 +132,26 @@ Price Trend:  ▂▄▅H▆▇█▆▅▄L▃ ▲
 
 ### Your Position
 
-* Shares owned
-* Strike price
+* Shares (or options) and strike price
 * Current position value
-* Unrealized profit / loss
+* **Gross P/L** — dollar amount and percentage (before tax)
 
-  * Dollar amount
-  * Percentage
+Values are color-coded: green for gains, red for losses.
 
-Values are color-coded:
+---
 
-* Green for gains
-* Red for losses
+### UK tax (optional)
+
+Share prices and P/L are in **USD**. UK tax is calculated in **GBP** (salary and tax bands). The dashboard converts the exercise gain to GBP for the calculation, then shows tax/NI/net in **USD** so everything is comparable.
+
+When `config.json` has `ukTax.annualSalary` (GBP) and `ukTax.usdToGbp` set and gross P/L is positive, the dashboard also shows:
+
+* **Income Tax (PAYE)** — estimated tax on the exercise gain (displayed in USD)
+* **Employee NI** — estimated National Insurance (displayed in USD)
+* **Net After Tax** — gain after tax and NI (USD)
+* **Effective Tax Rate** — (tax + NI) as a percentage of the gain
+
+Rates and bands use UK rules in GBP (personal allowance, basic/higher/additional rate, NI thresholds). This is an estimate only; consult a tax adviser for your situation.
 
 ---
 
@@ -120,17 +161,18 @@ Values are color-coded:
 
 ---
 
-## Price History Persistence
+## Files
 
-`ticker` saves recent prices to disk so your sparkline survives restarts.
+| File                   | Purpose |
+| ---------------------- | ------- |
+| `ticker.js`            | Main script; run with `node ticker.js` |
+| `utils.js`             | Formatting and sparkline (required) |
+| `tax.js`               | UK PAYE/NI estimation (required) |
+| `config.json.example` | Example config; copy to `config.json` and edit |
+| `config.json`          | Your config (optional): `ukTax.annualSalary` in GBP, `ukTax.usdToGbp` for USD→GBP; gitignored |
+| `price-history-<SYMBOL>.json` | Cached prices per symbol; gitignored |
 
-History files are stored as JSON in the current directory:
-
-```
-price-history-<SYMBOL>.json
-```
-
-Each symbol maintains its own independent history.
+Price history is saved so the sparkline survives restarts. Each symbol has its own file.
 
 ---
 
@@ -138,6 +180,7 @@ Each symbol maintains its own independent history.
 
 * Data is sourced from the public Nasdaq quote API
 * Quotes update as frequently as the refresh interval allows
+* UK tax figures are estimates (income tax bands and NI thresholds); not a substitute for professional advice
 * This is intended for informational use, not trading automation
 
 ---
