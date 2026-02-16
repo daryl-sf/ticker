@@ -46,56 +46,62 @@ const colorize = (value, formatted) => {
 };
 
 const sparkline = (data) => {
-  if (data.length < 2) return "";
+  if (data.length < 2) return "\n";
 
-  const MAX_LEN = 20;
+  const MAX_LEN = 50;
   const points = data.slice(-MAX_LEN);
 
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
 
-  // Horizontal scan line characters (bottom to top)
-  const lines = ["⎽", "⎼", "─", "⎻", "⎺"];
+  // Normalize to 0-7 (8 height levels across 2 rows)
+  const normalized = points.map((p) =>
+    Math.min(7, Math.floor(((p - min) / range) * 8))
+  );
 
-  let line = "";
+  // Line characters (bottom to top within each cell)
+  const lineChars = ["⎽", "⎼", "⎻", "⎺"];
 
-  for (let i = 0; i < points.length; i++) {
-    const n = points[i];
-    const idx = Math.min(
-      lines.length - 1,
-      Math.floor(((n - min) / range) * lines.length)
-    );
-    const char = lines[idx];
+  let topLine = "";
+  let bottomLine = "";
 
-    if (i === 0) {
-      line += char;
-      continue;
-    }
+  for (let i = 0; i < normalized.length; i++) {
+    const h = normalized[i];
 
-    const delta = n - points[i - 1];
+    let topChar = " ";
+    let bottomChar = " ";
 
-    if (delta > 0) {
-      line += `\x1b[32m${char}\x1b[0m`;
-    } else if (delta < 0) {
-      line += `\x1b[31m${char}\x1b[0m`;
+    if (h >= 4) {
+      topChar = lineChars[h - 4];
     } else {
-      line += char;
+      bottomChar = lineChars[h];
     }
+
+    // Color based on trend
+    if (i > 0) {
+      const delta = points[i] - points[i - 1];
+      if (delta > 0) {
+        if (topChar !== " ") topChar = `\x1b[32m${topChar}\x1b[0m`;
+        if (bottomChar !== " ") bottomChar = `\x1b[32m${bottomChar}\x1b[0m`;
+      } else if (delta < 0) {
+        if (topChar !== " ") topChar = `\x1b[31m${topChar}\x1b[0m`;
+        if (bottomChar !== " ") bottomChar = `\x1b[31m${bottomChar}\x1b[0m`;
+      }
+    }
+
+    topLine += topChar;
+    bottomLine += bottomChar;
   }
 
+  // Trend indicator
   const last = points[points.length - 1];
   const prev = points[points.length - 2];
+  let trend = " ▶";
+  if (last > prev) trend = " \x1b[32m▲\x1b[0m";
+  else if (last < prev) trend = " \x1b[31m▼\x1b[0m";
 
-  if (last > prev) {
-    return `${line} \x1b[32m▲\x1b[0m`;
-  }
-
-  if (last < prev) {
-    return `${line} \x1b[31m▼\x1b[0m`;
-  }
-
-  return `${line} ▶`;
+  return `${topLine}${trend}\n${bottomLine}`;
 };
 
 setInterval(async () => {
@@ -132,7 +138,7 @@ setInterval(async () => {
     const dailyDollarChange = netChangePerShare * shares;
 
     if (!firstRun) {
-      process.stdout.write("\x1b[18A\x1b[J");
+      process.stdout.write("\x1b[19A\x1b[J");
     }
     firstRun = false;
 
@@ -148,10 +154,11 @@ setInterval(async () => {
       `Percent Change:     ${primaryData.percentageChange || "N/A"}\n`
     );
     process.stdout.write(
-      `Price Trend:        ${sparkline(priceHistory)}\n`
+      `Price Trend:\n`
     );
+    process.stdout.write(sparkline(priceHistory));
 
-    process.stdout.write("\n— Your Position ———————————————————\n");
+    process.stdout.write("\n\n— Your Position ———————————————————\n");
     process.stdout.write(`Shares:             ${number.format(shares)}\n`);
     process.stdout.write(`Strike Price:       ${money.format(strikePrice)}\n`);
     process.stdout.write(`Position Value:     ${money.format(positionValue)}\n`);
